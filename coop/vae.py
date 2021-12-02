@@ -79,7 +79,8 @@ class VAE(nn.Module):
                  z: torch.Tensor,
                  num_beams: int = 4,
                  max_tokens: int = 256,
-                 bad_words: Union[str, List[str], List[int]] = None):
+                 bad_words: Union[str, List[str], List[int]] = None,
+                 perturb=False):
         if z.dim() == 1:
             z = z.unsqueeze(0)
 
@@ -92,6 +93,13 @@ class VAE(nn.Module):
                 bad_words_ids = bad_words
         else:
             bad_words_ids = None
+
+        if perturb:
+            return self.tgt_tokenizers.decode(self.model.generatePerturb(
+                z=z,
+                num_beams=num_beams,
+                max_tokens=max_tokens,
+                bad_words_ids=bad_words_ids))
 
         return self.tgt_tokenizers.decode(self.model.generate(
             z=z,
@@ -119,10 +127,17 @@ class VAE(nn.Module):
         else:
             bad_words_ids = None
 
-        return self.tgt_tokenizers.decode(self.model.generateKey(
-            z=z,
-            num_beams=num_beams,
-            max_tokens=max_tokens,
-            bad_words_ids=bad_words_ids,
-            keywords=keywords))
+        if keywords is not None:
+            return self.tgt_tokenizers.decode(self.model.generateKey(
+                z=z,
+                num_beams=num_beams,
+                max_tokens=max_tokens,
+                bad_words_ids=bad_words_ids,
+                keywords=keywords))
 
+        return self.tgt_tokenizers.decode(self.model.generate(
+                z=z,
+                num_beams=num_beams,
+                max_tokens=max_tokens,
+                bad_words_ids=bad_words_ids,
+                ))

@@ -34,7 +34,7 @@ qstat -f $PBS_JOBID >> $LOGFILE
 python3 -m pip install --user --upgrade -i http://pypi.repo.test.hhu.de/simple/ --trusted-host pypi.repo.test.hhu.de pip
 
 echo "load packages" >>  $LOGFILE
-pip install --user -q -i http://pypi.repo.test.hhu.de/simple/ --trusted-host pypi.repo.test.hhu.de nltk
+pip install --user -q -i http://pypi.repo.test.hhu.de/simple/ --trusted-host pypi.repo.test.hhu.de nltk 
 pip install --user -q -i http://pypi.repo.test.hhu.de/simple/ --trusted-host pypi.repo.test.hhu.de pandas==1.1.5
 pip install --user -q -i http://pypi.repo.test.hhu.de/simple/ --trusted-host pypi.repo.test.hhu.de tqdm>=4.41.0
 
