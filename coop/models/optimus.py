@@ -67,6 +67,41 @@ class Optimus(Model):
                 generated = None
             return VAEOut(q=q, generated=generated)
 
+    def forwardPre(self,
+                src: Dict[str, torch.Tensor],
+                tgt: Dict[str, torch.Tensor] = None,
+                keywords: Dict[str, torch.Tensor] = None,
+                do_generate: torch.Tensor = False,
+                num_beams: int = 4,
+                **kwargs):
+        cls_vec = self.encoder(**src).pooler_output
+        mu, log_var = torch.chunk(self.proj(cls_vec), chunks=2, dim=-1)
+        std = torch.exp(0.5 * log_var)
+        q = Normal(mu, std)
+        p = Normal(0, 1)
+        zkl_real = kl_divergence(q, p)
+        kl_mask = torch.gt(zkl_real, self.free_bit)
+        bz = cls_vec.size(0)
+        zkl = zkl_real[kl_mask].sum() / bz
+        zkl_real = zkl_real.sum(dim=-1).mean()
+
+        if self.training:
+            assert tgt is not None
+            z = q.rsample()
+            
+            outputs = self.decoder(**tgt,
+                                   past_key_values=(z,),
+                                   latent_as_gpt_memory=True,
+                                   latent_as_gpt_emb=True)
+            return Losses(nll=outputs.loss, zkl=zkl, zkl_real=zkl_real)
+        else:
+            if do_generate:
+                z = q.mean
+                generated = self.generate(z, num_beams=num_beams)
+            else:
+                generated = None
+            return VAEOut(q=q, generated=generated)
+
     @torch.no_grad()
     def generate(self,
                  z: torch.Tensor,
@@ -76,6 +111,35 @@ class Optimus(Model):
         bz, _ = z.size()
 
         input_ids = z.new_full((bz, 1), dtype=torch.long, fill_value=self.bos_id)
+        generated = self.decoder.generate(
+            input_ids,
+            max_length=max_tokens,
+            min_length=16,
+            num_beams=num_beams,
+            bad_words_ids=bad_words_ids,
+            bos_token_id=self.bos_id,
+            pad_token_id=self.pad_id,
+            eos_token_id=self.eos_id,
+            past_key_values=(z,),
+            no_repeat_ngram_size=2,
+            latent_as_gpt_memory=True,
+            latent_as_gpt_emb=True).tolist()
+        return generated
+
+    @torch.no_grad()
+    def generateKey(self,
+                 z: torch.Tensor,
+                 num_beams: int = 4,
+                 max_tokens: int = 256,
+                 bad_words_ids: List[int] = None,
+                 keywords: List[int] = None):
+        bz, _ = z.size()
+
+        input_ids = z.new_full((bz, 1), dtype=torch.long, fill_value=self.bos_id)
+        if keywords:
+            k = torch.LongTensor(keywords)
+            input_ids = torch.cat((input_ids,k.repeat(bz,1)), dim=1)
+
         generated = self.decoder.generate(
             input_ids,
             max_length=max_tokens,

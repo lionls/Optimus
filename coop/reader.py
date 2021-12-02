@@ -66,10 +66,11 @@ class OptimusDataset(Dataset):
         x = json.loads(linecache.getline(self.data_file, idx + 1))["text"]
         return x
 
-    def collate_fn(self, data: List[str]):
+    def collate_fn(self, data: List[str],k=None):
         src = self.src_tokenizer(data,)
         tgt = self.tgt_tokenizer(data)
-        return {"src": src, "tgt": tgt, "reviews": data}
+        k = self.tgt_tokenizer("~" + k + "~@")
+        return {"src": src, "tgt": tgt, "reviews": data, "keywords":k}
 
 
 class ReviewTest(Dataset):
